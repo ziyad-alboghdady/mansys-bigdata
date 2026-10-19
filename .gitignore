@@ -1,0 +1,13 @@
+target/
+*.class
+*.jar
+
+.idea/
+*.iml
+*.iws
+
+.env
+application-local.properties
+
+*.log
+logs/
