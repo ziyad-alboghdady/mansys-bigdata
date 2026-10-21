@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Adviser Report — SWE 307</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #f4f6f8;
+            color: #1b1f23;
+        }
+        nav {
+            background: #10233f;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        nav .brand { color: #fff; font-weight: 600; letter-spacing: .3px; }
+        nav a {
+            color: #c7d3e6;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        nav a:hover, nav a.active { background: #1b3763; }
+        nav a.active { background: #22406e; color: #fff; }
+        main { max-width: 1100px; margin: 28px auto; padding: 0 16px; }
+        h1 { font-size: 22px; margin: 0 0 4px; }
+        .sub { color: #5c6b7a; font-size: 14px; margin-bottom: 22px; }
+        .card {
+            background: #fff;
+            border: 1px solid #e1e6eb;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 22px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th {
+            text-align: left;
+            padding: 10px 12px;
+            background: #eef2f6;
+            color: #44546a;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            border-bottom: 1px solid #dbe2e9;
+        }
+        td { padding: 10px 12px; border-bottom: 1px solid #eef1f4; }
+        tr:hover td { background: #fafbfc; }
+        .avatar {
+            width: 46px; height: 46px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #dbe2e9;
+            display: block;
+        }
+        .muted { color: #9aa7b4; }
+        .score {
+            display: inline-block;
+            min-width: 38px;
+            text-align: center;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .ok   { background: #e4f5ea; color: #1a7f3c; }
+        .mid  { background: #fdf3e0; color: #96620a; }
+        .low  { background: #fde8e8; color: #a32121; }
+        form.upload { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        select, input[type=file] {
+            padding: 8px 10px;
+            border: 1px solid #ccd5de;
+            border-radius: 6px;
+            background: #fff;
+            font-size: 14px;
+        }
+        button {
+            padding: 9px 18px;
+            border: 0;
+            border-radius: 6px;
+            background: #22406e;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        button:hover { background: #2d5490; }
+        .note {
+            margin-top: 10px;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #e4f5ea;
+            color: #1a7f3c;
+        }
+        .files { font-size: 12px; color: #5c6b7a; line-height: 1.8; }
+        h2 { font-size: 15px; margin: 0 0 12px; color: #44546a; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">SWE 307 · Big Data</span>
+    <a href="/" class="active">Adviser Report</a>
+    <a href="/chat">AI Chat</a>
+</nav>
+
+<main>
+    <h1>Adviser Supervision Report</h1>
+    <p class="sub">
+        Rows from <strong>MySQL</strong> (cached in <strong>Redis</strong>) ·
+        photos streamed from <strong>Hadoop HDFS</strong>
+    </p>
+
+    <div class="card">
+        <table>
+            <thead>
+            <tr>
+                <th>Photo</th>
+                <th>Adviser</th>
+                <th>Head Adviser</th>
+                <th>Department</th>
+                <th>Student</th>
+                <th>Performance</th>
+                <th>Study</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${rows}">
+                <td th:with="img=${r.adviser.imageUrl} ?: 'nophoto.jpg'">
+                    <img class="avatar"
+                         th:src="@{'/image/' + ${img}}"
+                         th:alt="${r.adviser.name}">
+                </td>
+                <td th:text="${r.adviser.name}">—</td>
+                <td th:if="${r.adviser.headAdviser != null}"
+                    th:text="${r.adviser.headAdviser.name}">—</td>
+                <td th:unless="${r.adviser.headAdviser != null}"
+                    class="muted">— (top level)</td>
+                <td th:text="${r.adviser.department}">—</td>
+                <td th:text="${r.student}">—</td>
+                <td>
+                    <span class="score"
+                          th:text="${r.performance}"
+                          th:classappend="${r.performance == null} ? 'muted'
+                                        : (${r.performance} >= 85 ? 'ok'
+                                        : (${r.performance} >= 70 ? 'mid' : 'low'))">—</span>
+                </td>
+                <td th:text="${r.study.title}">—</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Upload a photo to HDFS</h2>
+        <form class="upload" th:action="@{/upload}" method="post" enctype="multipart/form-data">
+            <select name="adviserId" required>
+                <option th:each="a : ${advisers}"
+                        th:value="${a.id}"
+                        th:text="${a.name} + ' — ' + ${a.department}">adviser</option>
+            </select>
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit">Store in HDFS</button>
+        </form>
+        <div class="note" th:if="${param.uploaded}">
+            Stored in HDFS as <strong th:text="${param.uploaded[0]}">file</strong>
+            — MySQL updated, Redis cache cleared.
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Currently in hdfs://127.0.0.1:9000/swe307/images</h2>
+        <div class="files">
+            <div th:each="f : ${hdfsFiles}" th:text="${f}">file</div>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Chat — SWE 307</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #ffffff;
+            color: #1f2328;
+            display: flex;
+            flex-direction: column;
+        }
+        nav {
+            background: #10233f;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex: 0 0 auto;
+        }
+        nav .brand { color: #ffffff; font-weight: 600; letter-spacing: 0.3px; }
+        nav a {
+            color: #c7d3e6;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        nav a:hover { background: #1b3763; }
+        nav a.active { background: #22406e; color: #ffffff; }
+
+        #scroll {
+            flex: 1 1 auto;
+            overflow-y: auto;
+        }
+        #thread {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 32px 20px 24px;
+        }
+        .empty {
+            text-align: center;
+            color: #8b949e;
+            margin-top: 80px;
+        }
+        .empty h2 { font-size: 24px; color: #1f2328; margin-bottom: 8px; }
+        .empty p { font-size: 14px; }
+
+        .msg {
+            display: flex;
+            gap: 14px;
+            padding: 18px 0;
+        }
+        .msg + .msg { border-top: 1px solid #f0f2f4; }
+        .avatar {
+            flex: 0 0 30px;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .user .avatar { background: #22406e; }
+        .bot .avatar  { background: #0f8a5f; }
+        .bubble {
+            flex: 1 1 auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.65;
+            font-size: 15px;
+            padding-top: 4px;
+        }
+        .who {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7684;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .dots span {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            margin-right: 4px;
+            border-radius: 50%;
+            background: #b4bcc5;
+            animation: blink 1.2s infinite;
+        }
+        .dots span:nth-child(2) { animation-delay: 0.2s; }
+        .dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink {
+            0%, 80%, 100% { opacity: 0.25; }
+            40% { opacity: 1; }
+        }
+
+        #composer {
+            flex: 0 0 auto;
+            border-top: 1px solid #e6e9ec;
+            background: #ffffff;
+            padding: 16px 20px 22px;
+        }
+        #composer-inner {
+            max-width: 760px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            border: 1px solid #ccd5de;
+            border-radius: 14px;
+            padding: 10px 10px 10px 16px;
+            background: #ffffff;
+        }
+        #composer-inner:focus-within { border-color: #22406e; }
+        textarea {
+            flex: 1 1 auto;
+            border: 0;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.5;
+            max-height: 180px;
+            background: transparent;
+        }
+        #send {
+            flex: 0 0 auto;
+            width: 34px;
+            height: 34px;
+            border: 0;
+            border-radius: 9px;
+            background: #22406e;
+            color: #ffffff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #send:disabled { background: #c3cad2; cursor: default; }
+        .hint {
+            max-width: 760px;
+            margin: 10px auto 0;
+            text-align: center;
+            font-size: 12px;
+            color: #9aa7b4;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">SWE 307 · Big Data</span>
+    <a href="/">Adviser Report</a>
+    <a href="/chat" class="active">AI Chat</a>
+</nav>
+
+<div id="scroll">
+    <div id="thread">
+        <div class="empty" id="empty">
+            <h2>How can I help?</h2>
+            <p>Running llama3.2 locally through Ollama — no data leaves this machine.</p>
+        </div>
+    </div>
+</div>
+
+<div id="composer">
+    <div id="composer-inner">
+        <textarea id="input" rows="1" placeholder="Message the local model…"></textarea>
+        <button id="send" title="Send">↑</button>
+    </div>
+    <div class="hint">Local inference on your own hardware. Responses may take a few seconds.</div>
+</div>
+
+<script>
+    const thread  = document.getElementById('thread');
+    const scroll  = document.getElementById('scroll');
+    const input   = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const empty   = document.getElementById('empty');
+
+    const history = [];
+
+    function bubble(role, text) {
+        if (empty) empty.style.display = 'none';
+        const wrap = document.createElement('div');
+        wrap.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+        wrap.innerHTML =
+            '<div class="avatar">' + (role === 'user' ? 'ZA' : 'AI') + '</div>' +
+            '<div class="bubble"><div class="who">' +
+            (role === 'user' ? 'You' : 'llama3.2') +
+            '</div><div class="text"></div></div>';
+        wrap.querySelector('.text').textContent = text;
+        thread.appendChild(wrap);
+        scroll.scrollTop = scroll.scrollHeight;
+        return wrap;
+    }
+
+    function typing() {
+        if (empty) empty.style.display = 'none';
+        const wrap = document.createElement('div');
+        wrap.className = 'msg bot';
+        wrap.innerHTML =
+            '<div class="avatar">AI</div>' +
+            '<div class="bubble"><div class="who">llama3.2</div>' +
+            '<div class="dots"><span></span><span></span><span></span></div></div>';
+        thread.appendChild(wrap);
+        scroll.scrollTop = scroll.scrollHeight;
+        return wrap;
+    }
+
+    async function send() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+        sendBtn.disabled = true;
+
+        bubble('user', text);
+        history.push({ role: 'user', content: text });
+
+        const indicator = typing();
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: history })
+            });
+            const data = await res.json();
+            indicator.remove();
+            bubble('assistant', data.content);
+            history.push({ role: 'assistant', content: data.content });
+        } catch (err) {
+            indicator.remove();
+            bubble('assistant', 'Request failed: ' + err.message);
+        } finally {
+            sendBtn.disabled = false;
+            input.focus();
+        }
+    }
+
+    sendBtn.addEventListener('click', send);
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            send();
+        }
+    });
+
+    input.addEventListener('input', function () {
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+    });
+
+    input.focus();
+</script>
+
+</body>
+</html>
